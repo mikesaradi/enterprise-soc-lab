@@ -1,0 +1,29 @@
+```kusto
+// Query 1: Display 10 sample records
+StormEvents
+| take 10
+
+// Query 2: Filter tornado events
+StormEvents
+| where EventType == "Tornado"
+| project StartTime, State, EventType
+| take 10
+
+// Query 3: Count events by type
+StormEvents
+| summarize TotalEvents = count() by EventType
+| sort by TotalEvents desc
+| take 10
+
+// Query 4: Count events by state
+StormEvents
+| summarize TotalEvents = count() by State
+| sort by TotalEvents desc
+| take 10
+
+// Query 5: Count event types in Texas
+StormEvents
+| where State == "TEXAS"
+| summarize TotalEvents = count() by EventType
+| sort by TotalEvents desc
+```
