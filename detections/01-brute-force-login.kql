@@ -1,0 +1,8 @@
+SigninLogs
+| where TimeGenerated > ago(1h)
+| where ResultType != 0
+| summarize FailedAttempts = count(),
+            TargetUsers = dcount(UserPrincipalName)
+    by IPAddress, bin(TimeGenerated, 5m)
+| where FailedAttempts >= 5
+| sort by FailedAttempts desc
