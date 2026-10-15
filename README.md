@@ -1,21 +1,23 @@
+
 # Enterprise SOC Lab
 
-A hands-on Security Operations Center (SOC) training project focused on authentication log analysis, brute-force detection, KQL, and incident response.
+A hands-on Security Operations Center (SOC) training project focused on authentication log analysis, brute-force detection, KQL, automated testing, and incident response.
 
-## Project Objectives
+## Objectives
 
-- Analyze authentication events using Python.
-- Detect repeated failed login attempts within a defined time window.
-- Practice writing KQL detection queries for Microsoft Sentinel.
-- Document findings in a structured incident report.
-- Develop practical SOC investigation and documentation skills.
+- Analyze authentication logs using Python.
+- Detect repeated failed logins within a rolling time window.
+- Write KQL detection queries for Microsoft Sentinel.
+- Test detection logic with automated unit tests.
+- Document findings using an incident report.
 
-## Lab Environment
+## Environment
 
 - OS: Ubuntu 24.04 LTS
 - Python: 3.12
 - Data: Synthetic authentication logs
 - Query language: Kusto Query Language (KQL)
+- Dependencies: Python standard library
 
 ## Repository Structure
 
@@ -32,68 +34,73 @@ enterprise-soc-lab/
 │   └── 01-kql-basics.kql
 ├── notes/
 │   └── day-01.md
+├── tests/
+│   └── test_analyze_auth_logs.py
+├── .gitignore
 └── README.md
 ```
 
-## Detection: Potential Brute-Force Activity
+## Detection Scenario: Brute-Force Login Attempts
 
-The Python script analyzes authentication logs and identifies source IP addresses with at least five failed login attempts within a rolling five-minute window.
+The Python detector identifies source IP addresses with at least five failed authentication attempts within a rolling five-minute window.
 
-### Run the detection
+### Run the detector
 
-Requirements: Python 3.10 or newer. No third-party Python packages are required.
+From the repository root:
 
 ```bash
 python3 detections/analyze_auth_logs.py
 ```
 
-### Sample result
+### Run automated tests
 
-```text
-=== Brute-Force Detection ===
-
-ALERT: Potential brute-force activity
-Source IP: 203.0.113.50
-Failed attempts in 5 minutes: 5
-Targeted users: admin, mike, root
-Window: 2026-10-15T10:00:00+00:00 to 2026-10-15T10:00:20+00:00
-
-Total IP alerts: 1
+```bash
+python3 -m unittest discover -s tests -v
 ```
 
-The result above was produced using the lab's synthetic dataset.
+### Test coverage
+
+The current test suite validates:
+
+1. Five failures trigger an alert.
+2. Four failures do not trigger an alert.
+3. Failed attempts from different IPs are not combined.
+4. Failures outside the same five-minute window do not trigger an alert.
+
+**Latest test result:** 4 tests passed.
 
 ## KQL Detection
 
-The file `detections/01-brute-force-login.kql` contains a detection query designed for Microsoft Sentinel authentication data.
+`detections/01-brute-force-login.kql` contains a detection query designed for Microsoft Sentinel sign-in telemetry.
 
-It uses the `SigninLogs` table to aggregate failed sign-in attempts by source IP and five-minute time window.
+The query uses the `SigninLogs` table to aggregate failed sign-ins by IP address and five-minute time window.
 
-**Note:** This query requires a Microsoft Sentinel workspace containing the expected sign-in data. It has not been validated against a live Sentinel workspace in this lab.
+**Validation status:** The query has not been validated against a live Microsoft Sentinel workspace. It requires a suitable workspace with the expected table and fields.
 
-The exercises in `kql/01-kql-basics.kql` use sample data to practice KQL filtering, projection, aggregation, and sorting.
+The file `kql/01-kql-basics.kql` contains exercises for filtering, projection, aggregation, and sorting using sample data.
 
-## Incident Response
+## Incident Report
 
-The report `incidents/INC-001-brute-force.md` documents the simulated alert, evidence, analysis, recommended investigation steps, and potential MITRE ATT&CK mapping.
+`incidents/INC-001-brute-force.md` documents the simulated alert, supporting evidence, analysis, recommended investigation steps, and potential MITRE ATT&CK mapping.
 
 The activity is classified as potential brute-force behavior, not a confirmed security incident.
 
 ## Limitations
 
 - All authentication events are synthetic and intended for training.
-- The Python detector analyzes failed logins; it does not independently determine whether a subsequent successful login was unauthorized.
-- The KQL detection has not been tested against a live Microsoft Sentinel workspace.
-- Alert thresholds are configurable training values, not universal indicators of malicious activity.
+- The sample IP addresses are reserved for documentation and examples.
+- The Python detector focuses on failed logins and does not independently determine whether a subsequent successful login was unauthorized.
+- The Sentinel KQL query has not been tested against live security telemetry.
+- The detection threshold is a configurable training value, not a universal indicator of malicious activity.
 
 ## Future Improvements
 
-- Add automated unit tests for the Python detector.
-- Improve alert output and include successful logins in the investigation timeline.
+- Add tests for malformed log entries and missing fields.
+- Improve investigation timelines by correlating failed and successful logins.
 - Add additional detection scenarios.
-- Capture and document test results.
-- Validate KQL queries against an appropriately configured SIEM environment.
+- Validate detections against a suitable SIEM dataset.
+- Capture reproducible evidence of test results.
 
 ## Disclaimer
 
-This project is for educational and portfolio purposes only. It does not represent monitoring of a real organization or production environment.
+This project is for educational and portfolio purposes only. It does not monitor a real organization or production environment.
