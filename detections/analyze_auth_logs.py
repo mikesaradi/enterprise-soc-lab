@@ -1,65 +1,98 @@
 
+import argparse
 import csv
 from collections import defaultdict, deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from pathlib import Path
 
-LOG_FILE = "data/authentication.log"
+DEFAULT_LOG_FILE = Path("data/authentication.log")
 THRESHOLD = 5
 WINDOW = timedelta(minutes=5)
 
-events_by_ip = defaultdict(list)
 
-with open(LOG_FILE, newline="", encoding="utf-8") as file:
-    reader = csv.DictReader(file)
+def detect_brute_force(log_file):
+    events_by_ip = defaultdict(list)
 
-    for row in reader:
-        if row["status"].strip().lower() != "failed":
-            continue
+    with log_file.open(newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
 
-        timestamp = datetime.fromisoformat(
-            row["timestamp"].replace("Z", "+00:00")
-        )
+        for row in reader:
+            if row["status"].strip().lower() != "failed":
+                continue
 
-        events_by_ip[row["source_ip"]].append({
-            "timestamp": timestamp,
-            "username": row["username"],
-        })
+            timestamp = datetime.fromisoformat(
+                row["timestamp"].replace("Z", "+00:00")
+            )
 
-print("=== Brute-Force Detection ===")
-
-alerts = 0
-
-for ip, events in events_by_ip.items():
-    events.sort(key=lambda event: event["timestamp"])
-    window_events = deque()
-
-    for event in events:
-        window_events.append(event)
-
-        while (
-            window_events
-            and event["timestamp"] - window_events[0]["timestamp"] > WINDOW
-        ):
-            window_events.popleft()
-
-        if len(window_events) >= THRESHOLD:
-            users = sorted({
-                item["username"] for item in window_events
+            events_by_ip[row["source_ip"]].append({
+                "timestamp": timestamp,
+                "username": row["username"],
             })
 
-            print(f"\nALERT: Potential brute-force activity")
-            print(f"Source IP: {ip}")
-            print(f"Failed attempts in 5 minutes: {len(window_events)}")
-            print(f"Targeted users: {', '.join(users)}")
-            print(
-                "Window: "
-                f"{window_events[0]['timestamp'].isoformat()} "
-                f"to {event['timestamp'].isoformat()}"
-            )
-            alerts += 1
-            break
+    alerts = []
 
-if alerts == 0:
-    print("No activity met the detection threshold.")
-else:
-    print(f"\nTotal IP alerts: {alerts}")
+    for ip, events in events_by_ip.items():
+        events.sort(key=lambda event: event["timestamp"])
+        window_events = deque()
+
+        for event in events:
+            window_events.append(event)
+
+            while (
+                window_events
+                and event["timestamp"] - window_events[0]["timestamp"] > WINDOW
+            ):
+                window_events.popleft()
+
+            if len(window_events) >= THRESHOLD:
+                alerts.append({
+                    "source_ip": ip,
+                    "failed_attempts": len(window_events),
+                    "targeted_users": sorted({
+                        item["username"] for item in window_events
+                    }),
+                    "start": window_events[0]["timestamp"],
+                    "end": event["timestamp"],
+                })
+                break
+
+    return alerts
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Detect potential brute-force login activity."
+    )
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        default=DEFAULT_LOG_FILE,
+        help="Path to the authentication CSV log file.",
+    )
+    args = parser.parse_args()
+
+    if not args.log_file.is_file():
+        parser.error(f"Log file not found: {args.log_file}")
+
+    alerts = detect_brute_force(args.log_file)
+
+    print("=== Brute-Force Detection ===")
+
+    for alert in alerts:
+        print("\nALERT: Potential brute-force activity")
+        print(f"Source IP: {alert['source_ip']}")
+        print(f"Failed attempts in 5 minutes: {alert['failed_attempts']}")
+        print(f"Targeted users: {', '.join(alert['targeted_users'])}")
+        print(
+            f"Window: {alert['start'].isoformat()} "
+            f"to {alert['end'].isoformat()}"
+        )
+
+    if not alerts:
+        print("No activity met the detection threshold.")
+    else:
+        print(f"\nTotal IP alerts: {len(alerts)}")
+
+
+if __name__ == "__main__":
+    main()
